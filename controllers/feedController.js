@@ -141,9 +141,22 @@ exports.updatePost = (req, res, next) =>{
 
 }
 
+exports.deletePost = (req, res, next) =>{
+    const postId = req.params.postId
 
+    Post.findByIdAndDelete(postId)
+        .then(post =>{
+            if (post.imageUrl){
+                clearImage(post.imageUrl)
+            }
+        }).catch(err =>{
+        if (!err.statusCode) {
+            err.statusCode = 500
+        }
+        next(err)
+    })
+}
 const clearImage= (filePath) =>{
     filePath = path.join(__dirname, "..", filePath.replaceAll('/','\\'))
-    console.log("the file path is: " ,filePath)
     fs.unlink(filePath, err => console.log(err))
 }

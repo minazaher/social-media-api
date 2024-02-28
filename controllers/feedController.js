@@ -1,8 +1,11 @@
 const {validationResult} = require('express-validator')
 const fs = require('fs')
 const path = require('path')
-const Post = require('../models/post')
+
 const mongoose = require("mongoose");
+
+const Post = require('../models/post')
+const User = require('../models/user')
 
 const POSTS_PER_PAGE = 2
 
@@ -41,20 +44,33 @@ exports.createPost = (req, res, next) => {
         throw error
     }
 
-
     console.log(req.file)
 
     const title = req.body.title
     const content = req.body.content
     const imageUrl = req.file.path
-
+    let postCreator
+    console.log("user Id is : ", req.userId)
     const post = new Post({
-        title: title, content: content, imageUrl: imageUrl.replaceAll('\\', '/'), creator: {name: 'Mina'},
+        title: title,
+        content: content,
+        imageUrl: imageUrl.replaceAll('\\', '/'),
+        creator: req.userId,
     })
 
     post.save().then(post => {
+        return User.findById(req.userId)
+    }).then(user => {
+        postCreator = user
+        console.log("postCreator is,", postCreator)
+        user.posts.push(post)
+        return user.save()
+    }).then(creator => {
+        console.log(postCreator)
         res.status(201).json({
-            message: "Successfully Posted!", post: post
+            message: "Successfully Posted!",
+            post: post,
+            creator: {_id: postCreator._id, name: postCreator.name}
         })
     }).catch(err => {
         if (!err.statusCode) {
@@ -73,7 +89,7 @@ exports.getPost = (req, res, next) => {
         .then(post => {
             if (!post) {
                 const error = new Error("Post Not Found")
-                error.statusCode(404)
+                error.statusCode = 404
                 throw error
             }
             console.log(post.imageUrl)
@@ -116,20 +132,27 @@ exports.updatePost = (req, res, next) => {
         throw error
     }
 
-    Post.findById(postId)
+    Post.findOne({_id: postId})
         .then(post => {
             if (!post) {
+                console.log(req.userId)
                 const error = new Error("Post Not Found")
-                error.statusCode(404)
+                error.statusCode = 404
                 throw error
             }
-            if (imageUrl !== post.imageUrl) {
-                clearImage(post.imageUrl)
+            if (post.creator.toString() !== req.userId.toString()) {
+                const error = new Error('Not Authorized!')
+                error.statusCode = 403
+                throw error
+            } else {
+                if (imageUrl !== post.imageUrl) {
+                    clearImage(post.imageUrl)
+                }
+                post.title = title
+                post.content = content
+                post.imageUrl = imageUrl.replaceAll('\\', '/')
+                return post.save()
             }
-            post.title = title
-            post.content = content
-            post.imageUrl = imageUrl.replaceAll('\\', '/')
-            return post.save()
         }).then(result => {
         res.status(200).json({
             post: result, message: 'Updated Successfully'
@@ -148,12 +171,28 @@ exports.updatePost = (req, res, next) => {
 exports.deletePost = (req, res, next) => {
     const postId = req.params.postId
 
-    Post.findByIdAndDelete(postId)
+    Post.findById(postId)
         .then(post => {
             if (post.imageUrl) {
                 clearImage(post.imageUrl)
             }
-        }).catch(err => {
+            if (post.creator.toString() !== req.userId.toString()) {
+                const error = new Error('Not Authorized!')
+                error.statusCode = 403
+                throw error
+            } else {
+                return Post.deleteOne({_id: postId})
+            }
+        }).then((result) => {
+        return User.findById(req.userId)
+    }).then(user => {
+        user.posts.pull(postId)
+        return user.save()
+    }).then((result) => {
+        res.status(200).json({
+            result: result, message: 'Deleted Successfully'
+        })
+    }).catch(err => {
         if (!err.statusCode) {
             err.statusCode = 500
         }

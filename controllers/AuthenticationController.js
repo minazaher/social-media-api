@@ -41,7 +41,6 @@ exports.signup = async (req, res, next) => {
     } catch (err) {
         handleInternalServerErrors(err, next);
     }
-
 }
 
 exports.signIn = async (req, res, next) => {
@@ -59,7 +58,7 @@ exports.signIn = async (req, res, next) => {
                 const token = jwt.sign({
                     userEmail: user.email,
                     userId: user._id.toString()
-                },"SECRET KET", {expiresIn: '1h'})
+                },"SECRET KEY", {expiresIn: '1h'})
                 res.status(200).json({message: "Logged In", token: token})
             }
         } else {

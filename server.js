@@ -20,6 +20,7 @@ const  fileFilter = (req,file,cb) => {
 
 
 const feedRoutes = require('./routes/feed')
+const authRoutes = require('./routes/auth')
 
 const app = express()
 app.use(bodyParser.json())
@@ -32,6 +33,7 @@ app.use((req, res, next) => {
     next()
 })
 
+app.use('/auth', authRoutes)
 app.use('/feed', feedRoutes)
 
 app.use((err, req, res, next) => {

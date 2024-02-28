@@ -26,5 +26,6 @@ router.put('/signup',
     ],
     authenticationController.signup)
 
+router.put('/signin', authenticationController.signIn)
 
 module.exports = router

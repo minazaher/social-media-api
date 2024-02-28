@@ -28,16 +28,19 @@ exports.getPosts = (req, res, next) => {
 
 exports.createPost = (req, res, next) => {
     const errors = validationResult(req)
-    if (!req.file) {
-        const error = new Error("No Image Attached")
-        error.statusCode = 422
-        throw error
-    }
+
     if (!errors.isEmpty()) {
         const error = new Error('Validation Failed, entered data in incorrect')
         error.statusCode = 422
         throw error
     }
+
+    if (!req.file) {
+        const error = new Error("No Image Attached")
+        error.statusCode = 422
+        throw error
+    }
+
 
     console.log(req.file)
 

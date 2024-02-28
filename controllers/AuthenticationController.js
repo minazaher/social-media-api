@@ -12,7 +12,6 @@ const handleInternalServerErrors = (err, next) => {
     next(err);
 };
 
-
 const handleValidationErrors = (req, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -22,7 +21,6 @@ const handleValidationErrors = (req, next) => {
         throw validationError;
     }
 };
-
 
 exports.signup = async (req, res, next) => {
 

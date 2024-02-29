@@ -12,7 +12,7 @@ exports.getPosts = async (req, res, next) => {
     const currentPage = req.query.page || 1
     try {
         const totalItems = await Post.find().countDocuments()
-        const posts = await Post.find().populate('creator').skip((currentPage - 1) * POSTS_PER_PAGE).limit(POSTS_PER_PAGE)
+        const posts = await Post.find().populate('creator').skip((currentPage - 1) * POSTS_PER_PAGE).limit(POSTS_PER_PAGE).sort({createdAt : -1})
         res.status(200).json({message: "Fetched Successfully", posts: posts, totalItems: totalItems})
     } catch (err) {
         handleInternalServerErrors(err, next)

@@ -2,55 +2,11 @@ const {validationResult} = require('express-validator')
 const fs = require('fs')
 const path = require('path')
 
-const mongoose = require("mongoose");
-
+const io = require('../socket')
 const Post = require('../models/post')
 const User = require('../models/user')
 
 const POSTS_PER_PAGE = 2
-const handleValidationErrors = (req) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        const validationError = new Error('Validation Failed, entered data is incorrect');
-        validationError.statusCode = 422;
-        validationError.data = errors.array();
-        throw validationError;
-    }
-};
-
-const handleImageAttachmentErrors = (req) => {
-    if (!req.file) {
-        const error = new Error("No Image Attached")
-        error.statusCode = 422
-        throw error
-    }
-}
-const handlePostNotFoundError = (post) => {
-    if (!post) {
-        const error = new Error("Post Not Found")
-        error.statusCode = 404
-        throw error
-    }
-}
-
-const handleInternalServerErrors = (err, next) => {
-    if (!err.statusCode) {
-        err.statusCode = 500;
-    }
-    next(err);
-};
-
-const handleAuthorizationError = (req, post) => {
-    if (post.creator.toString() !== req.userId.toString()) {
-        const error = new Error('Not Authorized!')
-        error.statusCode = 403
-        throw error
-    }
-};
-const handlePostCreationErrors = (req) => {
-    handleValidationErrors(req)
-    handleImageAttachmentErrors(req)
-}
 
 exports.getPosts = async (req, res, next) => {
     const currentPage = req.query.page || 1
@@ -59,10 +15,7 @@ exports.getPosts = async (req, res, next) => {
         const posts = await Post.find().skip((currentPage - 1) * POSTS_PER_PAGE).limit(POSTS_PER_PAGE)
         res.status(200).json({message: "Fetched Successfully", posts: posts, totalItems: totalItems})
     } catch (err) {
-        if (!err.statusCode) {
-            err.statusCode = 500
-        }
-        next(err)
+        handleInternalServerErrors(err, next)
     }
 }
 
@@ -81,6 +34,10 @@ exports.createPost = async (req, res, next) => {
         const postCreator = await User.findById(req.userId)
         postCreator.posts.push(savedPost)
         await postCreator.save()
+        io.getIo().emit('posts',{
+            action: 'create',
+            post: savedPost
+        })
         res.status(201).json({
             message: "Successfully Posted!", post: post, creator: {_id: postCreator._id, name: postCreator.name}
         })
@@ -159,4 +116,44 @@ exports.deletePost = async (req, res, next) => {
 const clearImage = (filePath) => {
     filePath = path.join(__dirname, "..", filePath.replaceAll('/', '\\'))
     fs.unlink(filePath, err => console.log(err))
+}
+const handleValidationErrors = (req) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const validationError = new Error('Validation Failed, entered data is incorrect');
+        validationError.statusCode = 422;
+        validationError.data = errors.array();
+        throw validationError;
+    }
+};
+const handleImageAttachmentErrors = (req) => {
+    if (!req.file) {
+        const error = new Error("No Image Attached")
+        error.statusCode = 422
+        throw error
+    }
+}
+const handlePostNotFoundError = (post) => {
+    if (!post) {
+        const error = new Error("Post Not Found")
+        error.statusCode = 404
+        throw error
+    }
+}
+const handleInternalServerErrors = (err, next) => {
+    if (!err.statusCode) {
+        err.statusCode = 500;
+    }
+    next(err);
+};
+const handleAuthorizationError = (req, post) => {
+    if (post.creator.toString() !== req.userId.toString()) {
+        const error = new Error('Not Authorized!')
+        error.statusCode = 403
+        throw error
+    }
+};
+const handlePostCreationErrors = (req) => {
+    handleValidationErrors(req)
+    handleImageAttachmentErrors(req)
 }

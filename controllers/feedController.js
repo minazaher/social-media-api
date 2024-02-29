@@ -12,7 +12,7 @@ exports.getPosts = async (req, res, next) => {
     const currentPage = req.query.page || 1
     try {
         const totalItems = await Post.find().countDocuments()
-        const posts = await Post.find().skip((currentPage - 1) * POSTS_PER_PAGE).limit(POSTS_PER_PAGE)
+        const posts = await Post.find().populate('creator').skip((currentPage - 1) * POSTS_PER_PAGE).limit(POSTS_PER_PAGE)
         res.status(200).json({message: "Fetched Successfully", posts: posts, totalItems: totalItems})
     } catch (err) {
         handleInternalServerErrors(err, next)
@@ -34,9 +34,9 @@ exports.createPost = async (req, res, next) => {
         const postCreator = await User.findById(req.userId)
         postCreator.posts.push(savedPost)
         await postCreator.save()
-        io.getIo().emit('posts',{
+        io.getIo().emit('posts', {
             action: 'create',
-            post: savedPost
+            post: {...savedPost._doc, creator: {_id: req.userId, name: postCreator.name}}
         })
         res.status(201).json({
             message: "Successfully Posted!", post: post, creator: {_id: postCreator._id, name: postCreator.name}
@@ -50,7 +50,7 @@ exports.createPost = async (req, res, next) => {
 exports.getPost = async (req, res, next) => {
     const postId = req.params.postId
     try {
-        const post = await Post.findById(postId)
+        const post = await Post.findById(postId).populate('creator')
         handlePostNotFoundError(post)
         res.status(200).json({
             title: post.title,
@@ -74,10 +74,12 @@ exports.updatePost = async (req, res, next) => {
         imageUrl = req.file.path
     }
     try {
-        const post = await Post.findOne({_id: postId})
+        const post = await Post.findOne({_id: postId}).populate('creator')
         if (!post) handlePostNotFoundError(post)
-        handleAuthorizationError(req, next)
+        const creatorId = post.creator._id.toString()
+        handleAuthorizationError(creatorId, req, next)
         handleImageAttachmentErrors(req)
+
         if (imageUrl !== post.imageUrl) {
             clearImage(post.imageUrl)
         }
@@ -85,8 +87,11 @@ exports.updatePost = async (req, res, next) => {
         post.content = content
         post.imageUrl = imageUrl.replaceAll('\\', '/')
 
-        await post.save()
-
+        const savedPost = await post.save()
+        io.getIo().emit('posts', {
+            action: 'update',
+            post: {...savedPost._doc, creator: {_id: req.userId, name: savedPost.creator.name}}
+        })
         res.status(200).json({message: 'Updated Successfully'})
     } catch (err) {
         handleInternalServerErrors(err, next)
@@ -102,7 +107,9 @@ exports.deletePost = async (req, res, next) => {
         if (post.imageUrl) {
             clearImage(post.imageUrl)
         }
-        handleAuthorizationError(req, post)
+
+        const creatorId = post.creator.toString()
+        handleAuthorizationError(creatorId, req, post)
         await Post.deleteOne({_id: postId})
         const user = await User.findById(req.userId)
         user.posts.pull(postId)
@@ -146,8 +153,8 @@ const handleInternalServerErrors = (err, next) => {
     }
     next(err);
 };
-const handleAuthorizationError = (req, post) => {
-    if (post.creator.toString() !== req.userId.toString()) {
+const handleAuthorizationError = (id, req, post) => {
+    if (id !== req.userId.toString()) {
         const error = new Error('Not Authorized!')
         error.statusCode = 403
         throw error

@@ -31,7 +31,7 @@ module.exports = buildSchema(`
         }
         type AuthData{
             id: String!
-            token: String!
+            token: String! 
         }
             
         type RootQuery {

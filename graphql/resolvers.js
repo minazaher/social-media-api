@@ -1,8 +1,17 @@
 const User = require("../models/user")
+const Post = require("../models/post")
 
 const bcrypt = require('bcrypt')
 const jwt = require("jsonwebtoken")
 const validator = require('validator')
+
+const handleAuthenticationError = (req) =>{
+    if (!req.isAuth) {
+        const error = new Error('Not Authenticated')
+        error.code = 401
+        throw error
+    }
+}
 
 module.exports = {
     async createUser({user}, req) {
@@ -61,7 +70,54 @@ module.exports = {
             throw error
         }
 
-    }
+    },
+
+    async createPost({post}, req) {
+        const {title, content, imageUrl} = post
+
+        handleAuthenticationError(req)
+
+        const errors = []
+        if (!validator.isLength(title, {min: 5})) {
+            errors.push({message: "invalid title"})
+        }
+
+        if (errors.length > 0) {
+            const error = new Error("Invalid Input")
+            error.code = 422
+            error.data = errors
+            throw error
+        }
+
+        const user = await User.findById(req.userId)
+        if (!user) {
+            const error = new Error("Invalid User")
+            error.code = 401
+            throw error
+        }
+
+        const createdPost = new Post({
+            title: title,
+            content: content,
+            imageUrl: imageUrl,
+            creator : user
+        })
+
+        const savedPost = await createdPost.save()
+
+        user.posts.push(savedPost)
+        await user.save()
+
+        return {
+            ...savedPost._doc,
+            _id: savedPost._id.toString(),
+            createdAt: savedPost.createdAt.toISOString(),
+            updatedAt: savedPost.updatedAt.toISOString()
+        }
+
+
+
+}
 
 
 }

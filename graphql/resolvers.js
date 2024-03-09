@@ -4,6 +4,8 @@ const Post = require("../models/post")
 const bcrypt = require('bcrypt')
 const jwt = require("jsonwebtoken")
 const validator = require('validator')
+const POSTS_PER_PAGE = 2
+
 
 const handleAuthenticationError = (req) =>{
     if (!req.isAuth) {
@@ -117,7 +119,24 @@ module.exports = {
 
 
 
-}
+},
 
+    async getAllPosts({pageNumber},req) {
+        handleAuthenticationError(req)
+        const currentPage = pageNumber || 1
 
+        const totalItems = await Post.find().countDocuments()
+        let posts = await Post.find().populate('creator').skip((currentPage - 1) * POSTS_PER_PAGE).limit(POSTS_PER_PAGE).sort({createdAt : -1})
+
+        posts = posts.map(p => {
+            return {
+                ...p._doc,
+                _id: p._id,
+                createdAt: p.createdAt.toISOString(),
+                updatedAt: p.updatedAt.toISOString()
+            }
+        })
+
+        return {posts: posts, totalItems: totalItems}
+    }
 }

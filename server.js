@@ -4,11 +4,13 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const mongoose = require('mongoose')
 const multer = require('multer')
-const { graphqlHTTP } = require('express-graphql');
+const {graphqlHTTP} = require('express-graphql');
 
 const graphqlSchema = require('./graphql/schema')
 const graphqlResolver = require('./graphql/resolvers')
 const authenticationMiddleware = require('./middleware/isAuth')
+const errorHelper = require('./util/errorHelper')
+const fileHelper = require('./util/fileHelper')
 
 const DatabaseUri = 'mongodb+srv://MinaZaher:QvyBUi6Oq7TbXpks@cluster0.mysoorl.mongodb.net/RESTfulAPI'
 
@@ -31,7 +33,7 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'OPTIONS, GET, POST, PUT, PATCH, DELETE')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    if (req.method === 'OPTIONS'){
+    if (req.method === 'OPTIONS') {
         return res.sendStatus(200) // for graphql, because it only works with get and post requests
     }
     next()
@@ -40,16 +42,35 @@ app.use((req, res, next) => {
 
 app.use(authenticationMiddleware)
 
+app.put('/add-image', (req, res, next) => {
+
+    if (!req.isAuth) {
+        const error = new Error('Not Authenticated')
+        error.code = 401
+        throw error
+    }
+
+    if(!req.file){
+        return res.status(200).json({message: "No File Attached"})
+    }
+
+    if (req.body.oldPath) {
+        fileHelper.clearImage(req.body.oldPath)
+    }
+    return res.status(201).json({message: "File Stored", filePath: req.body.path})
+
+})
+
 app.use('/graphql', graphqlHTTP({
     schema: graphqlSchema,
     rootValue: graphqlResolver,
     graphiql: true,
     formatError(err) {
-        if (!err.originalError){
+        if (!err.originalError) {
             return err
         }
         const data = err.originalError.data
-        const message = err.message || "An error occured"
+        const message = err.message || "An error occurred"
         const code = err.originalError.code || 500
         return {data: data, message: message, code: code}
     }

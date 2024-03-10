@@ -8,7 +8,7 @@ const {clearImage} = require("../util/fileHelper");
 const POSTS_PER_PAGE = 2
 
 
-const handleAuthenticationError = (req) =>{
+const handleAuthenticationError = (req) => {
     if (!req.isAuth) {
         const error = new Error('Not Authenticated')
         error.code = 401
@@ -16,7 +16,7 @@ const handleAuthenticationError = (req) =>{
     }
 }
 
-const handlePostValidationError = (title, content) =>{
+const handlePostValidationError = (title, content) => {
 
     const errors = []
     if (!validator.isLength(title, {min: 5})) {
@@ -110,7 +110,7 @@ module.exports = {
             title: title,
             content: content,
             imageUrl: imageUrl,
-            creator : user
+            creator: user
         })
 
         const savedPost = await createdPost.save()
@@ -126,15 +126,14 @@ module.exports = {
         }
 
 
+    },
 
-},
-
-    async getAllPosts({pageNumber},req) {
+    async getAllPosts({pageNumber}, req) {
         handleAuthenticationError(req)
         const currentPage = pageNumber || 1
 
         const totalItems = await Post.find().countDocuments()
-        let posts = await Post.find().populate('creator').skip((currentPage - 1) * POSTS_PER_PAGE).limit(POSTS_PER_PAGE).sort({createdAt : -1})
+        let posts = await Post.find().populate('creator').skip((currentPage - 1) * POSTS_PER_PAGE).limit(POSTS_PER_PAGE).sort({createdAt: -1})
 
         posts = posts.map(p => {
             return {
@@ -148,7 +147,7 @@ module.exports = {
         return {posts: posts, totalItems: totalItems}
     },
 
-    async getPost({id}, req){
+    async getPost({id}, req) {
         handleAuthenticationError(req)
         const post = await Post.findById(id).populate('creator')
 
@@ -164,7 +163,7 @@ module.exports = {
             updatedAt: post.updatedAt.toISOString()
         }
     },
-    async updatePost({id, postInput}, req){
+    async updatePost({id, postInput}, req) {
         handleAuthenticationError(req)
 
         const post = await Post.findById(id).populate('creator')
@@ -174,22 +173,22 @@ module.exports = {
         post.title = title
         post.content = content
 
-        if(imageUrl !== 'undefined'){
+        if (imageUrl !== 'undefined') {
             post.imageUrl = imageUrl
         }
 
-        const savedPost =  await post.save()
+        const savedPost = await post.save()
 
         return {
             ...savedPost._doc,
             id: savedPost._id.toString(),
             createdAt: savedPost.createdAt.toISOString(),
-            updatedAt: savedPost.updatedAt.toISOString()}
+            updatedAt: savedPost.updatedAt.toISOString()
+        }
 
     },
-    async deletePost({id}, req, b: boolean = false) {
-        try
-        {
+    async deletePost({id}, req) {
+        try {
             handleAuthenticationError(req)
             const post = await Post.findByIdAndDelete(id)
             if (post.imageUrl) {
@@ -200,8 +199,31 @@ module.exports = {
             user.posts.pull(id)
             await user.save()
             return true
-        }catch (e) {
+        } catch (e) {
             return false
         }
+    },
+    async getUser(args, req) {
+        handleAuthenticationError(req)
+        const user = await User.findById(req.userId)
+        if (!user) {
+            const error = new Error('User Not Found')
+            error.code = 404
+            throw error
+        }
+        return {...user._doc, id: user._id.toString()}
+    },
+    async updateStatus({ status }, req) {
+        handleAuthenticationError(req)
+        const user = await User.findById(req.userId)
+        if (!user) {
+            const error = new Error('User Not Found')
+            error.code = 404
+            throw error
+        }
+        user.status = status
+        const savedUser = await user.save()
+        return {...savedUser._doc, id: savedUser._id.toString()}
+
     }
 }

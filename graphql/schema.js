@@ -41,6 +41,7 @@ module.exports = buildSchema(`
             createUser(user: UserDataInput): User!
             createPost(post: PostDataInput): Post!
             updatePost(id: ID!, postInput: PostDataInput): Post!
+            deletePost (id: ID!): Boolean!
             
         }
         type AuthData{

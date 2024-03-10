@@ -4,6 +4,7 @@ const Post = require("../models/post")
 const bcrypt = require('bcrypt')
 const jwt = require("jsonwebtoken")
 const validator = require('validator')
+const {clearImage} = require("../util/fileHelper");
 const POSTS_PER_PAGE = 2
 
 
@@ -185,5 +186,22 @@ module.exports = {
             createdAt: savedPost.createdAt.toISOString(),
             updatedAt: savedPost.updatedAt.toISOString()}
 
+    },
+    async deletePost({id}, req, b: boolean = false) {
+        try
+        {
+            handleAuthenticationError(req)
+            const post = await Post.findByIdAndDelete(id)
+            if (post.imageUrl) {
+                clearImage(post.imageUrl)
+            }
+            const creatorId = post.creator.toString()
+            const user = await User.findById(creatorId)
+            user.posts.pull(id)
+            await user.save()
+            return true
+        }catch (e) {
+            return false
+        }
     }
 }

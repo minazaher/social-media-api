@@ -15,6 +15,24 @@ const handleAuthenticationError = (req) =>{
     }
 }
 
+const handlePostValidationError = (title, content) =>{
+
+    const errors = []
+    if (!validator.isLength(title, {min: 5})) {
+        errors.push({message: "invalid title"})
+    }
+    if (!validator.isLength(content, {min: 5})) {
+        errors.push({message: "invalid Content"})
+    }
+
+    if (errors.length > 0) {
+        const error = new Error("Invalid Input")
+        error.code = 422
+        error.data = errors
+        throw error
+    }
+
+}
 module.exports = {
     async createUser({user}, req) {
         const {email, password, name} = user
@@ -78,18 +96,7 @@ module.exports = {
         const {title, content, imageUrl} = post
 
         handleAuthenticationError(req)
-
-        const errors = []
-        if (!validator.isLength(title, {min: 5})) {
-            errors.push({message: "invalid title"})
-        }
-
-        if (errors.length > 0) {
-            const error = new Error("Invalid Input")
-            error.code = 422
-            error.data = errors
-            throw error
-        }
+        handlePostValidationError(title, content)
 
         const user = await User.findById(req.userId)
         if (!user) {
@@ -138,5 +145,45 @@ module.exports = {
         })
 
         return {posts: posts, totalItems: totalItems}
+    },
+
+    async getPost({id}, req){
+        handleAuthenticationError(req)
+        const post = await Post.findById(id).populate('creator')
+
+        if (!post) {
+            const error = new Error("Post Not Found")
+            error.statusCode = 404
+            throw error
+        }
+        return {
+            ...post._doc,
+            _id: post._id.toString(),
+            createdAt: post.createdAt.toISOString(),
+            updatedAt: post.updatedAt.toISOString()
+        }
+    },
+    async updatePost({id, postInput}, req){
+        handleAuthenticationError(req)
+
+        const post = await Post.findById(id).populate('creator')
+        const {title, content, imageUrl} = postInput
+
+        handlePostValidationError(title, content)
+        post.title = title
+        post.content = content
+
+        if(imageUrl !== 'undefined'){
+            post.imageUrl = imageUrl
+        }
+
+        const savedPost =  await post.save()
+
+        return {
+            ...savedPost._doc,
+            id: savedPost._id.toString(),
+            createdAt: savedPost.createdAt.toISOString(),
+            updatedAt: savedPost.updatedAt.toISOString()}
+
     }
 }
